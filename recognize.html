@@ -1,0 +1,147 @@
+<!--
+This document's code takes inspiration from https://stackoverflow.com/questions/2368784/draw-on-html5-canvas-using-a-mouse
+and has been modified.
+-->
+
+<!DOCTYPE html>
+<html>
+<head> <title> Word Recognizer </title> </head>
+
+<script type="text/javascript">
+	var script = document.createElement('script');
+	script.src = 'https://code.jquery.com/jquery-3.4.1.min.js';
+	script.type = 'text/javascript';
+	document.getElementsByTagName('head')[0].appendChild(script);
+
+	var canvas, board;
+	var xold = 0, xnew = 0, yold = 0, ynew = 0;
+	var flag = false, dot_flag = false;
+	var num_word = 0;
+	var point_arr = [];
+
+	function init() {
+		canvas = document.getElementById('can');
+		drawdiv = document.getElementById('sketch');
+		word = document.getElementById("letters");
+		board = canvas.getContext("2d");
+
+		canvas.addEventListener("mousemove", function (e) {
+			findxy('move', e)
+		}, false);
+		canvas.addEventListener("mousedown", function (e) {
+			findxy('down', e)
+		}, false);
+		canvas.addEventListener("mouseup", function (e) {
+			findxy('up', e)
+		}, false);
+		canvas.addEventListener("mouseout", function (e) {
+			findxy('out', e)
+		}, false);
+	}
+
+	function draw() {
+		board.beginPath();
+
+		board.moveTo(xold, yold);
+		board.lineTo(xnew, ynew);
+
+		board.strokeStyle = "black";
+		board.lineWidth = 2;
+
+		board.stroke();
+		board.closePath();
+
+		point_arr[num_word-1].push([xnew, ynew]);
+	}
+
+	function clear_board() {
+		num_word = 0;
+		point_arr = [];
+		word.textContent = "";
+
+		board.clearRect(0, 0, canvas.width, canvas.height);
+		document.getElementById("canvasimg").style.display = "none";
+	}
+
+	function findxy(res, e) {
+		if (res == 'down') {
+			xold = xnew;
+			yold = ynew;
+			xnew = e.clientX - canvas.offsetLeft;
+			ynew = e.clientY - (canvas.offsetTop + drawdiv.offsetTop - window.pageYOffset);
+
+			point_arr.push([]);
+			num_word = num_word + 1;
+
+			flag = true;
+			dot_flag = true;
+
+			if (dot_flag) {
+				board.beginPath();
+				board.fillStyle = "black";
+				board.fillRect(xnew, ynew, 2, 2);
+				board.closePath();
+				dot_flag = false;
+			}
+		}
+
+		if (res == 'out') {
+			if (flag) {
+				$.ajax({
+					url: '/decipher',
+					type: 'POST',
+					data: JSON.stringify(point_arr[num_word-1]),
+					dataType: 'json',
+					success: function (data) {
+						word.textContent += data;
+					},
+					error: function (data) {
+					}
+				})
+			}
+			flag = false;
+		}
+
+		if (res == 'up') {
+			flag = false;
+
+			$.ajax({
+				url: '/decipher',
+				type: 'POST',
+				data: JSON.stringify(point_arr[num_word-1]),
+				dataType: 'json',
+				success: function (data) {
+					word.textContent += data;
+				},
+				error: function (data) {
+				}
+			})
+		}
+
+		if (res == 'move') {
+			if (flag) {
+				xold = xnew;
+				yold = ynew;
+				xnew = e.clientX - canvas.offsetLeft;
+				ynew = e.clientY - (canvas.offsetTop + drawdiv.offsetTop - window.pageYOffset);
+				draw();
+			}
+		}
+	}
+</script>
+
+	<body onload="init()">
+	<div id="intro" style="position:relative;left:20px;width:750px">
+			<h2>Word Recognizer</h2>
+			This application provides a canvas in which you can draw unistroke gestures. After drawing, the text area below will display the English letters that the gestures were interpreted as.<p>
+
+			Make sure to follow the Grafitti alphabet used on the Palm Pilot. The recognizer currently supports capital English letters.<p>
+		</div>
+
+	<div id="sketch" style="position:relative">
+		<canvas id="can" width="750" height="200" style="position:absolute;top:0px;left:20px;border:2px solid;"></canvas>
+		<textarea readonly id="letters" name="letters" rows="1" cols="50" style="position:absolute;top:225px;left:20px;"></textarea>
+		<input type="button" class="toolbarbutton" value="Clear Board" id="clr" size="50" onclick="clear_board()" style="position:absolute;top:225px;left:500px;">
+		</div>
+	</body>
+</html>
